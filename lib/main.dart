@@ -1,3 +1,4 @@
+import 'package:compounding_calculator/admob.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -104,20 +105,20 @@ class _HomePageState extends State<HomePage> {
     super.initState();
   }
 
-  void _loadAd() {
-    _bannerAd = BannerAd(
-      adUnitId: _bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (_) => setState(() => _isAdLoaded = true),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          debugPrint('BannerAd failed to load: $error');
-        },
-      ),
-    )..load();
-  }
+  // void _loadAd() {
+  //   _bannerAd = BannerAd(
+  //     adUnitId: _bannerAdUnitId,
+  //     size: AdSize.banner,
+  //     request: const AdRequest(),
+  //     listener: BannerAdListener(
+  //       onAdLoaded: (_) => setState(() => _isAdLoaded = true),
+  //       onAdFailedToLoad: (ad, error) {
+  //         ad.dispose();
+  //         debugPrint('BannerAd failed to load: $error');
+  //       },
+  //     ),
+  //   )..load();
+  // }
 
   @override
   void dispose() {
@@ -262,7 +263,10 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 32),
               FilledButton(
-                onPressed: _loadAd,
+               onPressed: () => AdService().showRewardedAd(
+ 
+    onAdDismissed: ()=> AdService().showInterstitialAd()
+  ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.all(16),
                   shape: RoundedRectangleBorder(
@@ -458,7 +462,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _launchPrivacy() async {
-    const url = 'https://your-privacy-policy-url.com';
+    const url = 'https://bilalparray.github.io/resume/compounding-calculator-privacy.html';
     if (await canLaunch(url)) await launch(url);
   }
 
