@@ -499,11 +499,11 @@ class _ResultSheetState extends State<ResultSheet> {
   bool _copied = false;
 
   String get _formattedResult {
-    final pattern =
-        // ignore: prefer_interpolation_to_compose_strings
-        widget.precision == 0 ? '#,##0' : '#,##0.' + '0' * widget.precision;
-    final format = NumberFormat(pattern, 'en_US');
-    return widget.currency + format.format(widget.amount);
+    final numberFormat =
+        widget.precision == 0 ? '#,##0' : '#,##0.${'0' * widget.precision}';
+    final formattedAmount =
+        NumberFormat(numberFormat, 'en_US').format(widget.amount);
+    return widget.currency + formattedAmount;
   }
 
   void _copyToClipboard() async {
@@ -527,6 +527,13 @@ class _ResultSheetState extends State<ResultSheet> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -556,12 +563,20 @@ class _ResultSheetState extends State<ResultSheet> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _formattedResult,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Text(
+                      _formattedResult,
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
