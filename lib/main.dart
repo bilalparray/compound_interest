@@ -128,10 +128,19 @@ class _HomePageState extends State<HomePage> {
     final isValid = _formKey.currentState!.validate();
 
     if (isValid) {
+      final double rate = double.parse(_rateController.text);
+      if (rate > 100) {
+        _rateFocus.requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Annual rate cannot exceed 100%')),
+        );
+        return;
+      }
+
       FocusScope.of(context).unfocus();
 
       final double P = double.parse(_principalController.text);
-      final double r = double.parse(_rateController.text) / 100;
+      final double r = rate / 100;
       double t = double.parse(_timeController.text);
       switch (_timeUnit) {
         case 'Months':
@@ -218,6 +227,13 @@ class _HomePageState extends State<HomePage> {
                   focusNode: _rateFocus,
                   label: 'Annual Rate (%)',
                   icon: Icons.percent_outlined,
+                  validator: (v) {
+                    final val = double.tryParse(v ?? '');
+                    if (val == null || val < 0 || val > 100) {
+                      return 'Enter a valid rate between 0 and 100';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -316,6 +332,7 @@ class _HomePageState extends State<HomePage> {
     required FocusNode focusNode,
     required String label,
     required IconData icon,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
@@ -330,11 +347,12 @@ class _HomePageState extends State<HomePage> {
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,10}'))
       ],
       keyboardType: TextInputType.number,
-      validator: (v) {
-        final val = double.tryParse(v ?? '');
-        if (val == null || val < 0) return 'Enter a valid positive number';
-        return null;
-      },
+      validator: validator ??
+          (v) {
+            final val = double.tryParse(v ?? '');
+            if (val == null || val < 0) return 'Enter a valid positive number';
+            return null;
+          },
     );
   }
 }
