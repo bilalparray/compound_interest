@@ -1,7 +1,7 @@
-import 'package:compounding_calculator/admob.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
 const String _bannerAdUnitId = 'ca-app-pub-3821692834936093/3250384525';
 
 class ResultSheet extends StatefulWidget {
@@ -99,9 +99,6 @@ class _ResultSheetState extends State<ResultSheet> {
           ),
           const SizedBox(height: 24),
           _buildBottomSheetAd(),
-           const SizedBox(height: 16),
-            AdService().bannerWidget,
-         
           FilledButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Close'),

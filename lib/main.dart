@@ -276,8 +276,6 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               // Two banner ads below calculate button, no background container
               AdService().bannerWidget,
-              const SizedBox(height: 16),
-              AdService().bannerWidget,
             ],
           ),
         ),
