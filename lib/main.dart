@@ -14,6 +14,7 @@ void main() async {
 
   if (!kIsWeb) {
     await MobileAds.instance.initialize();
+   
   }
   
   runApp(const MyApp());
@@ -273,7 +274,7 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text("Load Ad"),
+                child: const Text("Support To keep this app Free"),
               ),
 
               const SizedBox(height: 16),
