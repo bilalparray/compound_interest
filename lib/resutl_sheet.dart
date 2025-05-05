@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -24,8 +26,9 @@ class _ResultSheetState extends State<ResultSheet> {
   bool _copied = false;
 
   String get _formattedResult {
-    final value = double.tryParse(widget.result) ?? 0.0;
-    return value.toStringAsFixed(widget.precision);
+    final value = widget.result;
+
+    return value;
   }
 
   void _copyToClipboard() async {
