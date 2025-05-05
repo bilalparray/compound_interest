@@ -19,9 +19,9 @@ class AdService {
   // Initialize all ads
   Future<void> initialize() async {
     await MobileAds.instance.initialize();
+    _loadRewardedAd();
     _loadBannerAd();
     _loadInterstitialAd();
-    _loadRewardedAd();
   }
 
   // ======================== BANNER ADS ========================
@@ -50,6 +50,13 @@ class AdService {
           )
         : const SizedBox();
   }
+  Widget get bannerWidget => _bannerAd != null
+    ? SizedBox(
+        width: _bannerAd!.size.width.toDouble(),
+        height: _bannerAd!.size.height.toDouble(),
+        child: AdWidget(ad: _bannerAd!),
+      )
+    : const SizedBox();
 
   // ===================== INTERSTITIAL ADS =====================
   void _loadInterstitialAd() {
