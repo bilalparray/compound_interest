@@ -294,27 +294,34 @@ class _ChartPageState extends State<ChartPage> {
   }
 
   Widget _buildPieChart() {
+    // Define colors based on the current theme
+    final isDarkTheme = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = isDarkTheme ? Colors.blueAccent : Colors.blue;
+    final secondaryColor = isDarkTheme ? Colors.orangeAccent : Colors.orange;
+    final titleColor = isDarkTheme ? Colors.white : Colors.black;
+
     final principalSection = PieChartSectionData(
       value: widget.principal,
       title: 'Principal\n${_formatCurrency(widget.principal)}',
       radius: 80,
-      titleStyle: const TextStyle(
+      titleStyle: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.bold,
-        color: Colors.white,
+        color: titleColor,
       ),
-      color: Theme.of(context).colorScheme.primary,
+      color: primaryColor,
     );
+
     final interestSection = PieChartSectionData(
       value: _interestAmount,
       title: 'Interest\n${_formatCurrency(_interestAmount)}',
       radius: 80,
-      titleStyle: const TextStyle(
+      titleStyle: TextStyle(
         fontSize: 14,
         fontWeight: FontWeight.bold,
-        color: Colors.white,
+        color: titleColor,
       ),
-      color: Theme.of(context).colorScheme.secondary,
+      color: secondaryColor,
     );
 
     return SizedBox(

@@ -133,10 +133,10 @@ class _HomePageState extends State<HomePage> {
 
     if (isValid) {
       final double rate = double.parse(_rateController.text);
-      if (rate > 100) {
+      if (rate > 1000) {
         _rateFocus.requestFocus();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Annual rate cannot exceed 100%')),
+          const SnackBar(content: Text('Annual rate cannot exceed 1000%')),
         );
         return;
       }
@@ -174,8 +174,7 @@ class _HomePageState extends State<HomePage> {
       // We compute A here just so we can show a SnackBar or do anything else if needed.
       // But bottom sheet is gone—so we’ll go straight to ChartPage.
       final double A = P * pow((1 + (rPercent / 100) / n), n * tInYears);
-      // AdService().showRewardedAd(
-      //     onAdDismissed: () => AdService().showInterstitialAd());
+
       AdService().showRewardedAd(
         onAdDismissed: () {},
       );
@@ -210,7 +209,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -251,8 +249,8 @@ class _HomePageState extends State<HomePage> {
                   icon: Icons.percent_outlined,
                   validator: (v) {
                     final val = double.tryParse(v ?? '');
-                    if (val == null || val < 0 || val > 100) {
-                      return 'Enter a valid rate between 0 and 100';
+                    if (val == null || val < 0 || val > 1000) {
+                      return 'Enter a valid rate between 0 and 1000';
                     }
                     return null;
                   },
