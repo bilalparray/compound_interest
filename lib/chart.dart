@@ -1,3 +1,4 @@
+import 'package:compounding_calculator/admob.dart';
 import 'package:excel/excel.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:path_provider/path_provider.dart';
@@ -192,6 +193,12 @@ class _ChartPageState extends State<ChartPage> {
       ),
       body: Column(
         children: [
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              child: AdService().getBannerAdWidget(),
+            ),
+          ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

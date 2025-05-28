@@ -174,7 +174,11 @@ class _HomePageState extends State<HomePage> {
       // We compute A here just so we can show a SnackBar or do anything else if needed.
       // But bottom sheet is gone—so we’ll go straight to ChartPage.
       final double A = P * pow((1 + (rPercent / 100) / n), n * tInYears);
-
+      // AdService().showRewardedAd(
+      //     onAdDismissed: () => AdService().showInterstitialAd());
+      AdService().showRewardedAd(
+        onAdDismissed: () {},
+      );
       // → Instead of showing a bottom sheet, push to ChartPage:
       Navigator.push(
         context,

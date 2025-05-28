@@ -19,8 +19,8 @@ class AdService {
   // Initialize all ads
   Future<void> initialize() async {
     await MobileAds.instance.initialize();
-    _loadRewardedAd();
     _loadBannerAd();
+    _loadRewardedAd();
     _loadInterstitialAd();
   }
 
@@ -28,12 +28,11 @@ class AdService {
   void _loadBannerAd() {
     _bannerAd = BannerAd(
       adUnitId: 'ca-app-pub-3821692834936093/3250384525',
+      // adUnitId: 'ca-app-pub-3940256099942544/9214589741', //test id
       request: const AdRequest(),
       size: AdSize.banner,
       listener: BannerAdListener(
-        onAdLoaded: (_) => print('Banner ad loaded'),
         onAdFailedToLoad: (ad, err) {
-          print('Banner failed: ${err.message}');
           ad.dispose();
           _bannerAd = null;
         },
@@ -50,13 +49,34 @@ class AdService {
           )
         : const SizedBox();
   }
+
+  Widget getBannerAdWidget() {
+    final banner = BannerAd(
+      adUnitId: 'ca-app-pub-3821692834936093/3250384525',
+      // adUnitId: 'ca-app-pub-3940256099942544/9214589741', // test ad unit
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdFailedToLoad: (ad, error) {
+          ad.dispose();
+        },
+      ),
+    )..load();
+
+    return SizedBox(
+      width: banner.size.width.toDouble(),
+      height: banner.size.height.toDouble(),
+      child: AdWidget(ad: banner),
+    );
+  }
+
   Widget get bannerWidget => _bannerAd != null
-    ? SizedBox(
-        width: _bannerAd!.size.width.toDouble(),
-        height: _bannerAd!.size.height.toDouble(),
-        child: AdWidget(ad: _bannerAd!),
-      )
-    : const SizedBox();
+      ? SizedBox(
+          width: _bannerAd!.size.width.toDouble(),
+          height: _bannerAd!.size.height.toDouble(),
+          child: AdWidget(ad: _bannerAd!),
+        )
+      : const SizedBox();
 
   // ===================== INTERSTITIAL ADS =====================
   void _loadInterstitialAd() {
@@ -119,7 +139,6 @@ class AdService {
           _isLoadingRewarded = false;
         },
         onAdFailedToLoad: (err) {
-          print('Rewarded failed: ${err.message}');
           _isLoadingRewarded = false;
         },
       ),
@@ -127,7 +146,7 @@ class AdService {
   }
 
   Future<void> showRewardedAd({
-    required VoidCallback onAdDismissed,
+    required VoidCallback? onAdDismissed,
     VoidCallback? onRewardEarned,
     VoidCallback? onAdFailed,
   }) async {
@@ -140,7 +159,7 @@ class AdService {
     _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
-        onAdDismissed(); // Always called when ad closes
+        onAdDismissed!(); // Always called when ad closes
         _loadRewardedAd();
       },
       onAdFailedToShowFullScreenContent: (ad, err) {
