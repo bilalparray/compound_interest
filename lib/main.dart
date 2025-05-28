@@ -1,12 +1,15 @@
-import 'package:compounding_calculator/admob.dart';
-import 'package:compounding_calculator/resutl_sheet.dart';
-import 'package:compounding_calculator/settings.dart';
+// lib/main.dart
+
+import 'package:compounding_calculator/chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'package:compounding_calculator/admob.dart';
+import 'package:compounding_calculator/settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +55,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Compounding Calculator',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blueAccent,
@@ -140,18 +144,22 @@ class _HomePageState extends State<HomePage> {
       FocusScope.of(context).unfocus();
 
       final double P = double.parse(_principalController.text);
-      final double r = rate / 100;
-      double t = double.parse(_timeController.text);
+      final double rPercent = rate; // still “in percent”
+      final double rawTime = double.parse(_timeController.text); // e.g. “2.5”
+
+      // We’ll calculate “t in years” here just to compute the final amount if needed.
+      double tInYears = rawTime;
       switch (_timeUnit) {
         case 'Months':
-          t /= 12;
+          tInYears /= 12;
           break;
         case 'Weeks':
-          t /= 52;
+          tInYears /= 52;
           break;
         case 'Days':
-          t /= 365;
+          tInYears /= 365;
           break;
+        // 'Years' => leave tInYears as is
       }
 
       final freqMap = {
@@ -161,19 +169,29 @@ class _HomePageState extends State<HomePage> {
         'Semi-Annual': 2,
         'Annual': 1,
       };
-      final n = freqMap[_frequency]!;
-      final amount = P * pow((1 + r / n), n * t);
+      final int n = freqMap[_frequency]!;
 
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => ResultSheet(
-          amount: amount,
-          currency: widget.currency,
-          precision: widget.precision,
+      // We compute A here just so we can show a SnackBar or do anything else if needed.
+      // But bottom sheet is gone—so we’ll go straight to ChartPage.
+      final double A = P * pow((1 + (rPercent / 100) / n), n * tInYears);
+
+      // → Instead of showing a bottom sheet, push to ChartPage:
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChartPage(
+            principal: P,
+            annualRatePercent: rPercent,
+            timeValue: rawTime,
+            timeUnit: _timeUnit,
+            frequencyStr: _frequency,
+            currency: widget.currency,
+            precision: widget.precision,
+          ),
         ),
       );
     } else {
+      // existing error‐focus logic:
       if (_principalController.text.isEmpty ||
           double.tryParse(_principalController.text) == null ||
           double.parse(_principalController.text) < 0) {
@@ -294,16 +312,46 @@ class _HomePageState extends State<HomePage> {
                 ),
               ]),
               const SizedBox(height: 24),
-              FilledButton(
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 onPressed: () => AdService().showRewardedAd(
-                    onAdDismissed: () => AdService().showInterstitialAd()),
-                child: const Text('Support to keep this app free'),
+                  onAdDismissed: () => AdService().showInterstitialAd(),
+                ),
+                icon: const Icon(Icons.volunteer_activism_rounded),
+                label: const Text('Support to keep this app free'),
               ),
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: _calculate,
-                icon: const Icon(Icons.calculate_outlined),
+                icon: const Icon(Icons.calculate_outlined, size: 24),
                 label: const Text('Calculate Compound Interest'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.blueAccent.shade700,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
               AdService().bannerWidget,
@@ -316,12 +364,12 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildInputCard({required List<Widget> children}) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(0),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(0),
         child: Column(children: children),
       ),
     );

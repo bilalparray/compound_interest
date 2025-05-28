@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onChange;
@@ -48,10 +49,73 @@ class _SettingsPageState extends State<SettingsPage> {
     widget.onChange();
   }
 
-  void _launchPrivacy() async {
-    const url =
+  /// Centralized URL launcher helper
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid URL')),
+      );
+      return;
+    }
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open ${uri.toString()}')),
+      );
+    }
+  }
+
+  void _launchPrivacy() {
+    const privacyUrl =
         'https://bilalparray.github.io/resume/compounding-calculator-privacy.html';
-    if (await canLaunch(url)) await launch(url);
+    _launchUrl(privacyUrl);
+  }
+
+  Future<void> _shareApp() async {
+    const playStoreLink =
+        'https://play.google.com/store/apps/details?id=com.bilalparray07.compoundingcalculator';
+    await Share.share(
+      'Check out this Compounding Calculator app:\n$playStoreLink',
+      subject: 'Compounding Calculator',
+    );
+  }
+
+  void _contactViaEmail() {
+    // Build the mailto: URL string manually
+    const emailAddress = 'parraybilal34@gmail.com';
+    final mailtoUri = Uri(
+      scheme: 'mailto',
+      path: emailAddress,
+      query: Uri.encodeFull(
+        'subject=Feedback for Compounding Calculator&body=',
+      ),
+    ).toString();
+
+    _launchUrl(mailtoUri);
+  }
+
+  void _checkForUpdates() {
+    const playStoreUrl =
+        'https://play.google.com/store/apps/details?id=com.bilalparray07.compoundingcalculator';
+    _launchUrl(playStoreUrl);
+  }
+
+  void _leaveReview() {
+    final reviewUrl = Uri(
+      scheme: 'https',
+      host: 'play.google.com',
+      path: '/store/apps/details',
+      queryParameters: {
+        'id': 'com.bilalparray07.compoundingcalculator',
+        'action': 'write-review',
+      },
+    ).toString();
+
+    _launchUrl(reviewUrl);
   }
 
   @override
@@ -61,6 +125,7 @@ class _SettingsPageState extends State<SettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // ───────────────────────────────────────────────────────────────
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -82,6 +147,8 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // ───────────────────────────────────────────────────────────────
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -132,10 +199,51 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           const SizedBox(height: 24),
+
+          // ───────────────────────────────────────────────────────────────
           OutlinedButton(
             onPressed: _launchPrivacy,
             child: const Text('View Privacy Policy'),
           ),
+
+          const SizedBox(height: 24),
+
+          // ───────────────────────────────────────────────────────────────
+          Card(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.share_outlined),
+                  title: const Text('Share App'),
+                  subtitle: const Text('Tell friends about this app'),
+                  onTap: _shareApp,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.email_outlined),
+                  title: const Text('Contact Developer'),
+                  subtitle: const Text('parraybilal34@gmail.com'),
+                  onTap: _contactViaEmail,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.system_update_outlined),
+                  title: const Text('Check for Updates'),
+                  subtitle: const Text('Go to Play Store'),
+                  onTap: _checkForUpdates,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.rate_review_outlined),
+                  title: const Text('Feedback & Review'),
+                  subtitle: const Text('Leave a review on Play Store'),
+                  onTap: _leaveReview,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
