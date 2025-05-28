@@ -1,19 +1,16 @@
-// ignore_for_file: prefer_interpolation_to_compose_strings
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-
-const String _bannerAdUnitId = 'ca-app-pub-3821692834936093/3250384525';
+import 'package:intl/intl.dart';
 
 class ResultSheet extends StatefulWidget {
-  final String result;
+  final double amount;
   final String currency;
   final int precision;
 
   const ResultSheet({
     super.key,
-    required this.result,
+    required this.amount,
     required this.currency,
     required this.precision,
   });
@@ -26,14 +23,15 @@ class _ResultSheetState extends State<ResultSheet> {
   bool _copied = false;
 
   String get _formattedResult {
-    final value = widget.result;
-
-    return value;
+    final numberFormat =
+        widget.precision == 0 ? '#,##0' : '#,##0.${'0' * widget.precision}';
+    final formattedAmount =
+        NumberFormat(numberFormat, 'en_US').format(widget.amount);
+    return widget.currency + formattedAmount;
   }
 
   void _copyToClipboard() async {
-    final text = '${widget.currency}$_formattedResult';
-    await Clipboard.setData(ClipboardData(text: text));
+    await Clipboard.setData(ClipboardData(text: _formattedResult));
     setState(() {
       _copied = true;
     });
@@ -53,6 +51,13 @@ class _ResultSheetState extends State<ResultSheet> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -82,12 +87,20 @@ class _ResultSheetState extends State<ResultSheet> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '${widget.currency}$_formattedResult',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Text(
+                      _formattedResult,
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 IconButton(
@@ -116,7 +129,7 @@ class _ResultSheetState extends State<ResultSheet> {
       height: AdSize.banner.height.toDouble(),
       child: AdWidget(
         ad: BannerAd(
-          adUnitId: _bannerAdUnitId,
+          adUnitId: 'ca-app-pub-3821692834936093/3250384525',
           size: AdSize.banner,
           request: const AdRequest(),
           listener: BannerAdListener(
