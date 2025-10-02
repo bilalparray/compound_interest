@@ -18,7 +18,7 @@ class ChartPage extends StatefulWidget {
   final int precision;
 
   const ChartPage({
-    Key? key,
+    super.key,
     required this.principal,
     required this.annualRatePercent,
     required this.timeValue,
@@ -26,7 +26,7 @@ class ChartPage extends StatefulWidget {
     required this.frequencyStr,
     required this.currency,
     required this.precision,
-  }) : super(key: key);
+  });
 
   @override
   _ChartPageState createState() => _ChartPageState();
