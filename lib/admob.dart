@@ -92,7 +92,7 @@ class AdService {
           _isLoadingInterstitial = false;
         },
         onAdFailedToLoad: (err) {
-          print('Interstitial failed: ${err.message}');
+          debugPrint('Interstitial failed: ${err.message}');
           _isLoadingInterstitial = false;
         },
       ),

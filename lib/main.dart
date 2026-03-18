@@ -4,7 +4,6 @@ import 'package:compounding_calculator/chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -101,13 +100,17 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _principalController = TextEditingController();
   final TextEditingController _rateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
+  final TextEditingController _contributionController = TextEditingController();
 
   late final FocusNode _principalFocus;
   late final FocusNode _rateFocus;
   late final FocusNode _timeFocus;
+  late final FocusNode _contributionFocus;
 
   String _timeUnit = 'Years';
   String _frequency = 'Annual';
+  String _contributionFrequency = 'None';
+  bool _contributionAtBeginning = false;
 
   @override
   void initState() {
@@ -115,6 +118,7 @@ class _HomePageState extends State<HomePage> {
     _principalFocus = FocusNode();
     _rateFocus = FocusNode();
     _timeFocus = FocusNode();
+    _contributionFocus = FocusNode();
   }
 
   @override
@@ -122,9 +126,11 @@ class _HomePageState extends State<HomePage> {
     _principalController.dispose();
     _rateController.dispose();
     _timeController.dispose();
+    _contributionController.dispose();
     _principalFocus.dispose();
     _rateFocus.dispose();
     _timeFocus.dispose();
+    _contributionFocus.dispose();
     super.dispose();
   }
 
@@ -147,33 +153,7 @@ class _HomePageState extends State<HomePage> {
       final double rPercent = rate; // still “in percent”
       final double rawTime = double.parse(_timeController.text); // e.g. “2.5”
 
-      // We’ll calculate “t in years” here just to compute the final amount if needed.
-      double tInYears = rawTime;
-      switch (_timeUnit) {
-        case 'Months':
-          tInYears /= 12;
-          break;
-        case 'Weeks':
-          tInYears /= 52;
-          break;
-        case 'Days':
-          tInYears /= 365;
-          break;
-        // 'Years' => leave tInYears as is
-      }
-
-      final freqMap = {
-        'Daily': 365,
-        'Weekly': 52,
-        'Monthly': 12,
-        'Semi-Annual': 2,
-        'Annual': 1,
-      };
-      final int n = freqMap[_frequency]!;
-
-      // We compute A here just so we can show a SnackBar or do anything else if needed.
-      // But bottom sheet is gone—so we’ll go straight to ChartPage.
-      final double A = P * pow((1 + (rPercent / 100) / n), n * tInYears);
+      final double contribution = double.tryParse(_contributionController.text) ?? 0.0;
 
       AdService().showRewardedAd(
         onAdDismissed: () {},
@@ -188,6 +168,9 @@ class _HomePageState extends State<HomePage> {
             timeValue: rawTime,
             timeUnit: _timeUnit,
             frequencyStr: _frequency,
+            contributionAmount: contribution,
+            contributionFrequencyStr: _contributionFrequency,
+            contributionAtBeginning: _contributionAtBeginning,
             currency: widget.currency,
             precision: widget.precision,
           ),
@@ -271,7 +254,8 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _timeUnit,
+                        key: ValueKey('timeUnit-$_timeUnit'),
+                        initialValue: _timeUnit,
                         decoration: InputDecoration(
                           labelText: 'Unit',
                           border: OutlineInputBorder(
@@ -291,7 +275,8 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _frequency,
+                  key: ValueKey('frequency-$_frequency'),
+                  initialValue: _frequency,
                   decoration: InputDecoration(
                     labelText: 'Frequency',
                     border: OutlineInputBorder(
@@ -312,6 +297,63 @@ class _HomePageState extends State<HomePage> {
                           ))
                       .toList(),
                   onChanged: (v) => setState(() => _frequency = v!),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                Text(
+                  'Recurring contributions (optional)',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 12),
+                _buildCurrencyInput(
+                  controller: _contributionController,
+                  focusNode: _contributionFocus,
+                  label: 'Contribution Amount',
+                  icon: Icons.add_circle_outline,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return null;
+                    final val = double.tryParse(v);
+                    if (val == null || val < 0) {
+                      return 'Enter a valid contribution (or leave blank)';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('contribFrequency-$_contributionFrequency'),
+                  initialValue: _contributionFrequency,
+                  decoration: InputDecoration(
+                    labelText: 'Contribution Frequency',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.repeat_outlined),
+                  ),
+                  items: const [
+                    'None',
+                    'Daily',
+                    'Weekly',
+                    'Monthly',
+                    'Semi-Annual',
+                    'Annual',
+                  ]
+                      .map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _contributionFrequency = v!),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Apply contribution at beginning of period'),
+                  value: _contributionAtBeginning,
+                  onChanged: (_contributionFrequency == 'None')
+                      ? null
+                      : (v) => setState(() => _contributionAtBeginning = v),
                 ),
               ]),
               const SizedBox(height: 24),

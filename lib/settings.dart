@@ -62,6 +62,7 @@ class _SettingsPageState extends State<SettingsPage> {
       uri,
       mode: LaunchMode.externalApplication,
     );
+    if (!mounted) return;
     if (!opened) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not open ${uri.toString()}')),
@@ -78,9 +79,11 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _shareApp() async {
     const playStoreLink =
         'https://play.google.com/store/apps/details?id=com.bilalparray07.compoundingcalculator';
-    await Share.share(
-      'Check out this Compounding Calculator app:\n$playStoreLink',
-      subject: 'Compounding Calculator',
+    await SharePlus.instance.share(
+      ShareParams(
+        text: 'Check out this Compounding Calculator app:\n$playStoreLink',
+        subject: 'Compounding Calculator',
+      ),
     );
   }
 
