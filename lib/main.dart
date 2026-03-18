@@ -110,6 +110,8 @@ class _HomePageState extends State<HomePage> {
   late final FocusNode _contributionFocus;
   late final FocusNode _contributionStartAfterFocus;
 
+  bool _submitted = false;
+
   String _timeUnit = 'Years';
   String _frequency = 'Annual';
   String _contributionFrequency = 'None';
@@ -155,6 +157,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _calculate() {
+    setState(() => _submitted = true);
     final isValid = _formKey.currentState!.validate();
 
     if (isValid) {
@@ -240,7 +243,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.all(8),
         child: Form(
           key: _formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
+          autovalidateMode: AutovalidateMode.disabled,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -250,6 +253,7 @@ class _HomePageState extends State<HomePage> {
                   focusNode: _principalFocus,
                   label: 'Principal Amount',
                   icon: Icons.account_balance_wallet_outlined,
+                  required: true,
                 ),
                 const SizedBox(height: 16),
                 _buildCurrencyInput(
@@ -257,9 +261,14 @@ class _HomePageState extends State<HomePage> {
                   focusNode: _rateFocus,
                   label: 'Annual Rate (%)',
                   icon: Icons.percent_outlined,
+                  required: true,
                   validator: (v) {
-                    final val = double.tryParse(v ?? '');
-                    if (val == null || val < 0 || val > 1000) {
+                    if ((v == null || v.trim().isEmpty)) {
+                      return _submitted ? 'Rate is required' : null;
+                    }
+                    final val = double.tryParse(v);
+                    if (val == null) return 'Enter a valid number';
+                    if (val < 0 || val > 1000) {
                       return 'Enter a valid rate between 0 and 1000';
                     }
                     return null;
@@ -275,6 +284,16 @@ class _HomePageState extends State<HomePage> {
                         focusNode: _timeFocus,
                         label: 'Duration',
                         icon: Icons.timelapse_outlined,
+                        required: true,
+                        validator: (v) {
+                          if ((v == null || v.trim().isEmpty)) {
+                            return _submitted ? 'Duration is required' : null;
+                          }
+                          final val = double.tryParse(v);
+                          if (val == null) return 'Enter a valid number';
+                          if (val <= 0) return 'Enter a duration greater than 0';
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -337,6 +356,7 @@ class _HomePageState extends State<HomePage> {
                   focusNode: _contributionFocus,
                   label: 'Contribution Amount',
                   icon: Icons.add_circle_outline,
+                  required: false,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return null;
                     final val = double.tryParse(v);
@@ -529,24 +549,28 @@ class _HomePageState extends State<HomePage> {
     required String label,
     required IconData icon,
     String? Function(String?)? validator,
+    bool required = false,
   }) {
     return TextFormField(
       controller: controller,
       focusNode: focusNode,
+      autovalidateMode:
+          _submitted ? AutovalidateMode.always : AutovalidateMode.onUserInteraction,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon),
         border: const OutlineInputBorder(),
         floatingLabelBehavior: FloatingLabelBehavior.auto,
       ),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,10}'))
-      ],
       keyboardType: TextInputType.number,
       validator: validator ??
           (v) {
-            final val = double.tryParse(v ?? '');
-            if (val == null || val < 0) return 'Enter a valid positive number';
+            if (v == null || v.trim().isEmpty) {
+              return (required && _submitted) ? 'This field is required' : null;
+            }
+            final val = double.tryParse(v);
+            if (val == null) return 'Enter a valid number';
+            if (val < 0) return 'Enter a valid positive number';
             return null;
           },
     );
