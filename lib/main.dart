@@ -101,16 +101,21 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _rateController = TextEditingController();
   final TextEditingController _timeController = TextEditingController();
   final TextEditingController _contributionController = TextEditingController();
+  final TextEditingController _contributionStartAfterController =
+      TextEditingController(text: '0');
 
   late final FocusNode _principalFocus;
   late final FocusNode _rateFocus;
   late final FocusNode _timeFocus;
   late final FocusNode _contributionFocus;
+  late final FocusNode _contributionStartAfterFocus;
 
   String _timeUnit = 'Years';
   String _frequency = 'Annual';
   String _contributionFrequency = 'None';
   bool _contributionAtBeginning = false;
+  String _contributionMode = 'Aligned to compounding';
+  DateTime _contributionStartDate = DateTime.now();
 
   @override
   void initState() {
@@ -119,6 +124,7 @@ class _HomePageState extends State<HomePage> {
     _rateFocus = FocusNode();
     _timeFocus = FocusNode();
     _contributionFocus = FocusNode();
+    _contributionStartAfterFocus = FocusNode();
   }
 
   @override
@@ -127,11 +133,25 @@ class _HomePageState extends State<HomePage> {
     _rateController.dispose();
     _timeController.dispose();
     _contributionController.dispose();
+    _contributionStartAfterController.dispose();
     _principalFocus.dispose();
     _rateFocus.dispose();
     _timeFocus.dispose();
     _contributionFocus.dispose();
+    _contributionStartAfterFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickContributionStartDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _contributionStartDate,
+      firstDate: DateTime(now.year - 50),
+      lastDate: DateTime(now.year + 50),
+    );
+    if (picked == null) return;
+    setState(() => _contributionStartDate = picked);
   }
 
   void _calculate() {
@@ -153,7 +173,10 @@ class _HomePageState extends State<HomePage> {
       final double rPercent = rate; // still “in percent”
       final double rawTime = double.parse(_timeController.text); // e.g. “2.5”
 
-      final double contribution = double.tryParse(_contributionController.text) ?? 0.0;
+      final double contribution =
+          double.tryParse(_contributionController.text) ?? 0.0;
+      final int contributionStartAfterPeriods =
+          int.tryParse(_contributionStartAfterController.text) ?? 0;
 
       AdService().showRewardedAd(
         onAdDismissed: () {},
@@ -171,6 +194,9 @@ class _HomePageState extends State<HomePage> {
             contributionAmount: contribution,
             contributionFrequencyStr: _contributionFrequency,
             contributionAtBeginning: _contributionAtBeginning,
+            contributionMode: _contributionMode,
+            contributionStartAfterPeriods: contributionStartAfterPeriods,
+            contributionStartDate: _contributionStartDate,
             currency: widget.currency,
             precision: widget.precision,
           ),
@@ -355,6 +381,83 @@ class _HomePageState extends State<HomePage> {
                       ? null
                       : (v) => setState(() => _contributionAtBeginning = v),
                 ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('contribMode-$_contributionMode'),
+                  initialValue: _contributionMode,
+                  decoration: InputDecoration(
+                    labelText: 'Contribution Mode',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.tune_outlined),
+                  ),
+                  items: const [
+                    'Aligned to compounding',
+                    'Calendar-based',
+                  ]
+                      .map((e) => DropdownMenuItem(
+                            value: e,
+                            child: Text(e),
+                          ))
+                      .toList(),
+                  onChanged: (_contributionFrequency == 'None')
+                      ? null
+                      : (v) => setState(() => _contributionMode = v!),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        controller: _contributionStartAfterController,
+                        focusNode: _contributionStartAfterFocus,
+                        decoration: const InputDecoration(
+                          labelText: 'Start after (contribution periods)',
+                          prefixIcon: Icon(Icons.skip_next_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        validator: (v) {
+                          if (_contributionFrequency == 'None') return null;
+                          final val = int.tryParse(v ?? '');
+                          if (val == null || val < 0) {
+                            return 'Enter 0 or more';
+                          }
+                          return null;
+                        },
+                        enabled: _contributionFrequency != 'None',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton.icon(
+                        onPressed: (_contributionFrequency == 'None')
+                            ? null
+                            : _pickContributionStartDate,
+                        icon: const Icon(Icons.event_outlined),
+                        label: Text(
+                          '${_contributionStartDate.year.toString().padLeft(4, '0')}-'
+                          '${_contributionStartDate.month.toString().padLeft(2, '0')}-'
+                          '${_contributionStartDate.day.toString().padLeft(2, '0')}',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_contributionFrequency != 'None' &&
+                    _contributionMode == 'Calendar-based') ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Calendar-based uses real dates from the selected start date.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ]),
               const SizedBox(height: 24),
               FilledButton.icon(

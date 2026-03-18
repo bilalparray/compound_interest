@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as flutter;
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -17,6 +18,9 @@ class ChartPage extends StatefulWidget {
   final double contributionAmount;
   final String contributionFrequencyStr;
   final bool contributionAtBeginning;
+  final String contributionMode;
+  final int contributionStartAfterPeriods;
+  final DateTime contributionStartDate;
   final String currency;
   final int precision;
 
@@ -30,6 +34,9 @@ class ChartPage extends StatefulWidget {
     required this.contributionAmount,
     required this.contributionFrequencyStr,
     required this.contributionAtBeginning,
+    required this.contributionMode,
+    required this.contributionStartAfterPeriods,
+    required this.contributionStartDate,
     required this.currency,
     required this.precision,
   });
@@ -45,6 +52,8 @@ class ChartPageState extends State<ChartPage> {
   late final double _interestAmount;
   late final double _totalContributed;
   late final List<Map<String, dynamic>> _schedule;
+  bool _showContributedLine = true;
+  bool _showChartGrid = true;
 
   @override
   void initState() {
@@ -69,6 +78,33 @@ class ChartPageState extends State<ChartPage> {
     }
   }
 
+  DateTime _addMonths(DateTime dt, int months) {
+    final yearOffset = (dt.month - 1 + months) ~/ 12;
+    final newYear = dt.year + yearOffset;
+    final newMonth = ((dt.month - 1 + months) % 12) + 1;
+    final lastDayOfNewMonth = DateTime(newYear, newMonth + 1, 0).day;
+    final newDay = min(dt.day, lastDayOfNewMonth);
+    return DateTime(newYear, newMonth, newDay, dt.hour, dt.minute, dt.second,
+        dt.millisecond, dt.microsecond);
+  }
+
+  DateTime _addContributionInterval(DateTime dt, String frequency) {
+    switch (frequency) {
+      case 'Daily':
+        return dt.add(const Duration(days: 1));
+      case 'Weekly':
+        return dt.add(const Duration(days: 7));
+      case 'Monthly':
+        return _addMonths(dt, 1);
+      case 'Semi-Annual':
+        return _addMonths(dt, 6);
+      case 'Annual':
+        return _addMonths(dt, 12);
+      default:
+        return dt;
+    }
+  }
+
   void _computeSchedule() {
     double t = widget.timeValue;
     switch (widget.timeUnit) {
@@ -90,10 +126,14 @@ class ChartPageState extends State<ChartPage> {
     final r = widget.annualRatePercent / 100.0;
     final ratePerPeriod = r / _n;
 
-    final contribEnabled =
-        widget.contributionFrequencyStr != 'None' && widget.contributionAmount > 0;
-    final contribFreq = contribEnabled ? _freqPerYear(widget.contributionFrequencyStr) : 0;
-    final contribIntervalYears = contribFreq > 0 ? (1.0 / contribFreq) : double.infinity;
+    final contribEnabled = widget.contributionFrequencyStr != 'None' &&
+        widget.contributionAmount > 0 &&
+        widget.contributionStartAfterPeriods >= 0;
+
+    final contribFreq =
+        contribEnabled ? _freqPerYear(widget.contributionFrequencyStr) : 0;
+    final contribIntervalYears =
+        contribFreq > 0 ? (1.0 / contribFreq) : double.infinity;
 
     final totalPeriodsExact = _n * _tInYears;
     final fullPeriods = totalPeriodsExact.floor();
@@ -105,12 +145,46 @@ class ChartPageState extends State<ChartPage> {
     double contributed = P;
     double currentTime = 0.0;
 
-    // Contribution timing model (time-based, works even if contribution frequency != comp frequency):
-    // - Beginning: apply when contribution time == currentTime
-    // - End: apply when contribution time is in (currentTime, nextTime]
-    double nextContributionTime = contribEnabled ? 0.0 : double.infinity;
-    if (contribEnabled && !widget.contributionAtBeginning) {
-      nextContributionTime = contribIntervalYears;
+    final isCalendarBased = widget.contributionMode == 'Calendar-based';
+    final isAlignedToCompounding =
+        widget.contributionMode == 'Aligned to compounding';
+
+    // Generate calendar-based contribution times in years-from-start.
+    final calendarContributionTimes = <double>[];
+    if (contribEnabled && isCalendarBased) {
+      final start = DateTime(
+        widget.contributionStartDate.year,
+        widget.contributionStartDate.month,
+        widget.contributionStartDate.day,
+      );
+      final end = start.add(Duration(days: (_tInYears * 365.0).round()));
+
+      // Determine the first contribution date based on timing + start-after.
+      DateTime next = start;
+      if (!widget.contributionAtBeginning) {
+        next = _addContributionInterval(next, widget.contributionFrequencyStr);
+      }
+      for (int i = 0; i < widget.contributionStartAfterPeriods; i++) {
+        next = _addContributionInterval(next, widget.contributionFrequencyStr);
+      }
+
+      while (!next.isAfter(end)) {
+        final days = next.difference(start).inDays;
+        final timeYears = days / 365.0;
+        if (timeYears >= -1e-12 && timeYears <= _tInYears + 1e-12) {
+          calendarContributionTimes.add(timeYears);
+        }
+        next = _addContributionInterval(next, widget.contributionFrequencyStr);
+      }
+      calendarContributionTimes.sort();
+    }
+
+    // Contribution scheduling for aligned-to-compounding mode.
+    // We advance a "next contribution time" in years, but apply it at the *next* compounding boundary.
+    double nextContributionTime = double.infinity;
+    if (contribEnabled && isAlignedToCompounding) {
+      nextContributionTime = widget.contributionAtBeginning ? 0.0 : contribIntervalYears;
+      nextContributionTime += widget.contributionStartAfterPeriods * contribIntervalYears;
     }
 
     schedule.add({
@@ -121,28 +195,65 @@ class ChartPageState extends State<ChartPage> {
       'interestToDate': balance - contributed,
     });
 
+    int calendarIdx = 0;
+
     for (int i = 1; i <= fullPeriods; i++) {
       final nextTime = i / _n;
 
+      // Contributions at beginning of this compounding period.
       if (contribEnabled && widget.contributionAtBeginning) {
-        while ((nextContributionTime - currentTime).abs() < 1e-12 ||
-            nextContributionTime < currentTime + 1e-12) {
-          balance += widget.contributionAmount;
-          contributed += widget.contributionAmount;
-          nextContributionTime += contribIntervalYears;
-          if (nextContributionTime > _tInYears + 1e-12) break;
+        if (isCalendarBased) {
+          while (calendarIdx < calendarContributionTimes.length &&
+              calendarContributionTimes[calendarIdx] <= currentTime + 1e-12) {
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            calendarIdx++;
+          }
+        } else if (isAlignedToCompounding) {
+          while (nextContributionTime <= currentTime + 1e-12) {
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            nextContributionTime += contribIntervalYears;
+            if (nextContributionTime > _tInYears + 1e-12) break;
+          }
+        } else {
+          // Fallback (shouldn't happen): behave like time-based.
+          while (nextContributionTime <= currentTime + 1e-12) {
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            nextContributionTime += contribIntervalYears;
+            if (nextContributionTime > _tInYears + 1e-12) break;
+          }
         }
       }
 
       // Interest accrual over a full compounding period.
       balance *= (1.0 + ratePerPeriod);
 
+      // Contributions at end of this compounding period.
       if (contribEnabled && !widget.contributionAtBeginning) {
-        while (nextContributionTime <= nextTime + 1e-12) {
-          balance += widget.contributionAmount;
-          contributed += widget.contributionAmount;
-          nextContributionTime += contribIntervalYears;
-          if (nextContributionTime > _tInYears + 1e-12) break;
+        if (isCalendarBased) {
+          while (calendarIdx < calendarContributionTimes.length &&
+              calendarContributionTimes[calendarIdx] <= nextTime + 1e-12) {
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            calendarIdx++;
+          }
+        } else if (isAlignedToCompounding) {
+          while (nextContributionTime <= nextTime + 1e-12) {
+            // Apply on the boundary we just reached.
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            nextContributionTime += contribIntervalYears;
+            if (nextContributionTime > _tInYears + 1e-12) break;
+          }
+        } else {
+          while (nextContributionTime <= nextTime + 1e-12) {
+            balance += widget.contributionAmount;
+            contributed += widget.contributionAmount;
+            nextContributionTime += contribIntervalYears;
+            if (nextContributionTime > _tInYears + 1e-12) break;
+          }
         }
       }
 
@@ -218,6 +329,22 @@ class ChartPageState extends State<ChartPage> {
       TextCellValue(widget.contributionFrequencyStr)
     ]);
     summary.appendRow([
+      TextCellValue('Contribution Mode'),
+      TextCellValue(widget.contributionMode),
+    ]);
+    summary.appendRow([
+      TextCellValue('Contribution Start After (periods)'),
+      IntCellValue(widget.contributionStartAfterPeriods),
+    ]);
+    summary.appendRow([
+      TextCellValue('Contribution Start Date'),
+      TextCellValue(
+        '${widget.contributionStartDate.year.toString().padLeft(4, '0')}-'
+        '${widget.contributionStartDate.month.toString().padLeft(2, '0')}-'
+        '${widget.contributionStartDate.day.toString().padLeft(2, '0')}',
+      ),
+    ]);
+    summary.appendRow([
       TextCellValue('Contribution Timing'),
       TextCellValue(widget.contributionAtBeginning ? 'Beginning' : 'End')
     ]);
@@ -289,51 +416,191 @@ class ChartPageState extends State<ChartPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Line chart (balance vs time)
-            SizedBox(
-              height: 220,
-              child: LineChart(
-                LineChartData(
-                  gridData: const FlGridData(show: true),
-                  borderData: FlBorderData(show: false),
-                  titlesData: const FlTitlesData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      isCurved: true,
-                      color: primaryColor,
-                      barWidth: 3,
-                      dotData: const FlDotData(show: false),
-                      spots: _schedule
-                          .map((r) => FlSpot(
-                                (r['timeYears'] as double).toDouble(),
-                                (r['amount'] as double).toDouble(),
-                              ))
-                          .toList(),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Key stats',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
                     ),
-                    LineChartBarData(
-                      isCurved: true,
-                      color: secondaryColor,
-                      barWidth: 2,
-                      dotData: const FlDotData(show: false),
-                      spots: _schedule
-                          .map((r) => FlSpot(
-                                (r['timeYears'] as double).toDouble(),
-                                (r['contributed'] as double).toDouble(),
-                              ))
-                          .toList(),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        _StatChip(
+                          label: 'Final balance',
+                          value: _formatCurrency(_finalAmount),
+                        ),
+                        _StatChip(
+                          label: 'Total contributed',
+                          value: _formatCurrency(_totalContributed),
+                        ),
+                        _StatChip(
+                          label: 'Interest earned',
+                          value: _formatCurrency(_interestAmount),
+                        ),
+                        _StatChip(
+                          label: 'Duration',
+                          value: '${_tInYears.toStringAsFixed(2)} yr',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Assumptions',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      children: [
+                        const SizedBox(height: 8),
+                        _AssumptionRow(
+                          label: 'Compounding',
+                          value: widget.frequencyStr,
+                        ),
+                        _AssumptionRow(
+                          label: 'Contribution amount',
+                          value: _formatCurrency(widget.contributionAmount),
+                        ),
+                        _AssumptionRow(
+                          label: 'Contribution frequency',
+                          value: widget.contributionFrequencyStr,
+                        ),
+                        _AssumptionRow(
+                          label: 'Contribution timing',
+                          value:
+                              widget.contributionAtBeginning ? 'Beginning' : 'End',
+                        ),
+                        _AssumptionRow(
+                          label: 'Contribution mode',
+                          value: widget.contributionMode,
+                        ),
+                        _AssumptionRow(
+                          label: 'Start after',
+                          value: '${widget.contributionStartAfterPeriods} period(s)',
+                        ),
+                        _AssumptionRow(
+                          label: 'Start date',
+                          value:
+                              '${widget.contributionStartDate.year.toString().padLeft(4, '0')}-'
+                              '${widget.contributionStartDate.month.toString().padLeft(2, '0')}-'
+                              '${widget.contributionStartDate.day.toString().padLeft(2, '0')}',
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _LegendDot(color: primaryColor, label: 'Balance'),
-                const SizedBox(width: 16),
-                _LegendDot(color: secondaryColor, label: 'Contributed'),
-              ],
+            const SizedBox(height: 16),
+
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Chart',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: _showChartGrid ? 'Hide grid' : 'Show grid',
+                          onPressed: () =>
+                              setState(() => _showChartGrid = !_showChartGrid),
+                          icon: Icon(
+                            _showChartGrid
+                                ? Icons.grid_on_outlined
+                                : Icons.grid_off_outlined,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: _showContributedLine
+                              ? 'Hide contributed'
+                              : 'Show contributed',
+                          onPressed: () => setState(() =>
+                              _showContributedLine = !_showContributedLine),
+                          icon: Icon(
+                            _showContributedLine
+                                ? Icons.stacked_line_chart_outlined
+                                : Icons.stacked_line_chart,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: 220,
+                      child: LineChart(
+                        LineChartData(
+                          gridData: FlGridData(show: _showChartGrid),
+                          borderData: FlBorderData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              isCurved: true,
+                              color: primaryColor,
+                              barWidth: 3,
+                              dotData: const FlDotData(show: false),
+                              spots: _schedule
+                                  .map((r) => FlSpot(
+                                        (r['timeYears'] as double).toDouble(),
+                                        (r['amount'] as double).toDouble(),
+                                      ))
+                                  .toList(),
+                            ),
+                            if (_showContributedLine)
+                              LineChartBarData(
+                                isCurved: true,
+                                color: secondaryColor,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                                spots: _schedule
+                                    .map((r) => FlSpot(
+                                          (r['timeYears'] as double).toDouble(),
+                                          (r['contributed'] as double).toDouble(),
+                                        ))
+                                    .toList(),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _LegendDot(color: primaryColor, label: 'Balance'),
+                        const SizedBox(width: 16),
+                        if (_showContributedLine)
+                          _LegendDot(
+                              color: secondaryColor, label: 'Contributed'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -499,6 +766,78 @@ class _LegendDot extends StatelessWidget {
         const SizedBox(width: 6),
         Text(label, style: Theme.of(context).textTheme.bodyMedium),
       ],
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        border: flutter.Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssumptionRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _AssumptionRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
