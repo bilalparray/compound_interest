@@ -2,7 +2,7 @@ name: compounding_calculator
 description: "Tool to Calculate Compound Interest"
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.7+14
+version: 1.0.8+15
 
 environment:
   sdk: ^3.6.2
@@ -42,4 +42,8 @@ flutter_icons:
 
 flutter_native_splash:
   image: "assets/splash.png" # Path to your splash screen image
-  # color: "#ffffff" # Background color for the splash screen
+  color: "#ffffff" # Background color for the splash screen
+
+  android_12:
+    image: "assets/splash.png"
+    color: "#ffffff"
